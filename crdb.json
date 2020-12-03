@@ -12,7 +12,7 @@
           "url": "https://api-raas-site-a.apps.bbokdoct.redisdemo.com",
           "credentials": {
             "username": "b@rl.com",
-            "password": "3TMyDRum"
+            "password": "..."
           },
           "name": "rec-a.raas-site-a.svc.cluster.local",
           "replication_endpoint": "test-db-raas-site-a.apps.bbokdoct.redisdemo.com:443",
@@ -24,7 +24,7 @@
           "url": "https://api-raas-site-b.apps.bbokdoct.redisdemo.com",
           "credentials": {
             "username": "b@rl.com",
-            "password": "tfPCmn6h"
+            "password": "..."
           },
           "name": "rec-b.raas-site-b.svc.cluster.local",
           "replication_endpoint": "test-db-raas-site-b.apps.bbokdoct.redisdemo.com:443",

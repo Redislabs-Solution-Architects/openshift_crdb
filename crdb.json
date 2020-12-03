@@ -1,0 +1,38 @@
+{
+    "default_db_config": {
+      "name": "test-db",
+      "replication": false,
+      "memory_size": 10240000,
+      "aof_policy": "appendfsync-every-sec",
+      "shards_count": 1
+    },
+    "instances": [
+      {
+        "cluster": {
+          "url": "https://api-raas-site-a.apps.bbokdoct.redisdemo.com",
+          "credentials": {
+            "username": "b@rl.com",
+            "password": "3TMyDRum"
+          },
+          "name": "rec-a.raas-site-a.svc.cluster.local",
+          "replication_endpoint": "test-db-raas-site-a.apps.bbokdoct.redisdemo.com:443",
+          "replication_tls_sni": "test-db-raas-site-a.apps.bbokdoct.redisdemo.com"
+        }
+      },
+      {
+        "cluster": {
+          "url": "https://api-raas-site-b.apps.bbokdoct.redisdemo.com",
+          "credentials": {
+            "username": "b@rl.com",
+            "password": "tfPCmn6h"
+          },
+          "name": "rec-b.raas-site-b.svc.cluster.local",
+          "replication_endpoint": "test-db-raas-site-b.apps.bbokdoct.redisdemo.com:443",
+          "replication_tls_sni": "test-db-raas-site-b.apps.bbokdoct.redisdemo.com"
+        }
+      }
+    ],
+    "name": "test-db",
+    "encryption": true,
+    "compression": 0
+  }

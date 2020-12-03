@@ -159,7 +159,7 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
         }
       }
     ],
-    "name": "<db_name>"",
+    "name": "<db_name>",
     "encryption": true,
     "compression": 0
   }

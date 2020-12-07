@@ -1,6 +1,5 @@
 # How to Create an Active-active (CRDB) in Redis Enterprise for Openshift
 
-<!-- TOC -->autoauto- [How to Create an Active-active (CRDB) in Redis Enterprise for Openshift](#how-to-create-an-active-active-crdb-in-redis-enterprise-for-openshift)auto    - [Pre-requisites](#pre-requisites)auto    - [Topology](#topology)auto    - [High Level Workflow](#high-level-workflow)auto    - [Required Parameters](#required-parameters)auto    - [Let's go!](#lets-go)auto    - [Troubleshooting steps](#troubleshooting-steps)autoauto<!-- /TOC -->
 
 ## Pre-requisites 
 
@@ -248,7 +247,7 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 route.route.openshift.io/test-db     test-db-raas-site-b.apps.bbokdoct.redisdemo.com           test-db    17946   passthrough   None
 ```
 
-## <a href="troubleshooting"></a>Troubleshooting steps 
+## Troubleshooting Steps
 
 
 1. Symptom: API endpoint not reachable

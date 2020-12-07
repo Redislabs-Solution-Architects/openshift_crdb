@@ -1,12 +1,14 @@
 # How to Create an Active-active (CRDB) in Redis Enterprise for Openshift
 
+<!-- TOC -->autoauto- [How to Create an Active-active (CRDB) in Redis Enterprise for Openshift](#how-to-create-an-active-active-crdb-in-redis-enterprise-for-openshift)auto    - [Pre-requisites](#pre-requisites)auto    - [Topology](#topology)auto    - [High Level Workflow](#high-level-workflow)auto    - [Required Parameters](#required-parameters)auto    - [Let's go!](#lets-go)auto    - [Troubleshooting steps](#troubleshooting-steps)autoauto<!-- /TOC -->
+
 ## Pre-requisites 
 
 * Two working Redis Enteprise Clusters (REC) in different Openshift environments
   * Important Note: the two RECs should have *different* `names`/`fqdn`. If this is not met, the CRDB creation will result in bad state.
 * REC _admin role_ credentials to both RECs
 * Appropriate resources available in each REC to create DBs of the requested size.
-* Openshift Permissions: _todo_
+* Openshift Permissions: a role that allows the creation of Openshift routes.
 
 ## Topology
 <img src="images/topology.png" />
@@ -22,31 +24,30 @@ The following is the high level workflow which you will follow:
 The following parameters will be required to form the JSON payload to create the CRDB. 
 | Parameter | Parameter Name in REST API | Name in `crdb-cli`| Description |
 | --------- | ---  | --- | --- |
-| Cluster FQDN | `name` | `fqdn` | This is the name of the REC as determined from ` GET https://<rec_api>/v1/cluster | jq .name`|
-| API URL | `url` | `url` | This is the route the API endpoint as specified in `apiIngressURL`. Should be prefixed with `https://` |
+| <a href="name"></a>Cluster FQDN | `name` | `fqdn` | This is the name of the REC as determined from ` GET https://<rec_api>/v1/cluster | jq .name`|
+| <a href="url"></a>API URL | `url` | `url` | This is the route the API endpoint as specified in `apiIngressURL`. Should be prefixed with `https://` |
 | Cluster Admin Username/password | `credentials` | `username`,`password` | Cluster Admin role username/password |
 | Replication Endpoint | `replication_endpoint` | `replication_endpoint` | This will be <`your_db_name`><`dbIngressSuffix`>:443 where `dbIngressSuffix` is specified in your REC spec |
-| Replication TLS SNI | `replication_tls_sni` | `replication_tls_sni` | _todo_ |
-
+| Replication TLS SNI | `replication_tls_sni` | `replication_tls_sni` | This is the same as your `replication_endpoint`, but no port number required. |
 
 
 Here is an example when creating a CRDB with database name <i>test-db</i>:
 | Parameter Name in REST API | Example value | 
 | -------------------------- | ------------- |
-| `name` | `https://api-raas-site-a.apps.bbokdoct.redisdemo.com` |
-| `url` | rec-a.raas-site-a.svc.cluster.local |
+| `name` | rec-a.raas-site-a.svc.cluster.local |
+| `url` | `https://api-raas-site-a.apps.bbokdoct.redisdemo.com` |
 | `credentials` | username: `b@rl.com`, password: `something` | 
 | `replication_endpoint` | <i>test-db</i><span style="color:orange">-raas-site-a.apps.bbokdoct.redisdemo.com</span>:443  |
 | `replication_tls_sni` | <i>test-db</i><span style="color:orange">-raas-site-a.apps.bbokdoct.redisdemo.com</span> |
-
+*Note:* My openshift cluster creates routes at the subdomain `*.apps.bbokdoct.redisdemo.com` by default where my openshift cluster name is `bbokdoct.redisdemo.com`.
 
 ## Let's go!
 
 Ensure you've documented the required parameters as in the above section. You'll need these!
 
-1. Apply the `activeActive` spec to both Redis Enterprise clusters appropriately. Details about the REC API are <a href="https://github.com/RedisLabs/redis-enterprise-k8s-docs/blob/master/redis_enterprise_cluster_api.md" target="_blank">here</a>.
+*Important Note:* In the samples below I am creating two Redis Enterprise Clusters (RECs) in the *same* Openshift cluster but two distinct namespaces. The same steps will apply for RECs in different Openshift clusters. 
 
-_todo_ add validatation of the dbIngressSuffix; is it a configmap?
+1. Apply the `activeActive` spec to both Redis Enterprise clusters appropriately. Details about the REC API are <a href="https://github.com/RedisLabs/redis-enterprise-k8s-docs/blob/master/redis_enterprise_cluster_api.md" target="_blank">here</a>.
 
 REC at site A:
 ```
@@ -62,6 +63,26 @@ REC at site B:
     dbIngressSuffix: -raas-site-b.apps.bbokdoct.redisdemo.com
     method: openShiftRoute
 ```    
+
+You can validate that these were applied by describing the `rec` as follows:
+```
+$ k describe rec -n raas-site-a | grep -A 3 Active
+<snip>
+--
+  Active Active:
+    API Ingress URL:       api-raas-site-a.apps.bbokdoct.redisdemo.com
+    Db Ingress Suffix:     -raas-site-a.apps.bbokdoct.redisdemo.com
+    Method:                openShiftRoute
+
+$ k describe rec -n raas-site-b | grep -A 3 Active
+<snip>
+--
+  Active Active:
+    API Ingress URL:       api-raas-site-b.apps.bbokdoct.redisdemo.com
+    Db Ingress Suffix:     -raas-site-b.apps.bbokdoct.redisdemo.com
+    Method:                openShiftRoute
+```
+
 This will result in the API route `api-`<`clustername`> being added in both sites as below:
 
 Redis Enterprise Cluster in Site A
@@ -123,7 +144,7 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 
 
 
-2. Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
+1. Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
 ```
 {
     "default_db_config": {
@@ -166,14 +187,36 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 ```
 
 3. Apply the following to the API endpoint at *just one* cluster:
-`curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdbs -X POST -H 'Content-Type: application/json' -d@crdb.json`
+
+`curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdbs -X POST -H 'Content-Type: application/json' -d @crdb.json`
+
+*Note:* `curl` some users are having difficulty specifying the payload with the `-d` argument. Please consult your curl manual or try postman. 
+
 You should see a reply from the API as in the following which indicates the payload was well formed and the request is being actioned:
 ```
 {
   "id": "eb091f0a-839e-48a6-989f-8b5e0034f132",
   "status": "queued"
 }
-```   
+```
+*Note* Did you get something other than `queued` as a response? Then proceed to the [troubleshooting](#troubleshooting) section of the document. 
+
+You can get the status of the above task by issuing a GET on `/v1/crdbs/<id>`. Here is an example of a failed task:
+```
+$ curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdb_tasks/e32924c1-c8a1-4da6-a702-e1604ceab715
+{
+  "errors": [
+    {
+      "cluster_name": "",
+      "description": "Error [401]",
+      "error_code": "internal_error"
+    }
+  ],
+  "id": "e32924c1-c8a1-4da6-a702-e1604ceab715",
+  "status": "failed"
+}
+```
+
 If successful, you will see the DB created in the Redis Enterprise UI for a healthy and syncing CRDB:
 <img src="images/active-db.png" />
 
@@ -205,5 +248,35 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 route.route.openshift.io/test-db     test-db-raas-site-b.apps.bbokdoct.redisdemo.com           test-db    17946   passthrough   None
 ```
 
-## Troubleshooting steps
-_todo_
+## <a href="troubleshooting"></a>Troubleshooting steps 
+
+
+1. Symptom: API endpoint not reachable
+The API endpoint is not reachable from one cluster to the other. 
+   
+    * Open a shell side a one of the Redis Enterprise cluster pods:
+  
+      ```
+      oc exec -it rec-a-0 -- /bin/bash
+      $ curl -ivk https://api-raas-site-b.apps.bbokdoct.redisdemo.com
+      ...
+      HTTP/1.1 401 UNAUTHORIZED
+      ...
+      WWW-Authenticate: ... realm="rec-b.raas-site-b.svc.cluster.local"
+      ```
+      It is expected that you will get a "401" response but check that the returned "realm" reflects the remote cluster's FQDN as in [Required Parameters: `name`](#name).
+
+    * Perform the same step as above from the other site, to the former. 
+    * If one or both of these steps above do not result in "401" with the appropriate "realm" then the contact your Openshift administrator for help troubleshooting an Openshift Route to the [REC API endpoint](#url). 
+  
+
+1. API response 400, bad request:
+```
+{
+  "detail": "None is not of type 'object'",
+  "status": 400,
+  "title": "Bad Request",
+  "type": "about:blank"
+}
+```
+    * Your payload is not being passed to the API or the payload is not valid JSON. Please Lint your JSON or try Postman with built-in JSON validate.

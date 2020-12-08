@@ -5,6 +5,6 @@ metadata:
 spec:
   redisEnterpriseCluster:
     name: rec-a 
-  memorySize: 4000MB
-  replication: true
+  memorySize: 100MB
+  replication: false 
   persistence: snapshotEvery1Hour

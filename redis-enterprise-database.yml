@@ -1,0 +1,10 @@
+apiVersion: app.redislabs.com/v1alpha1
+kind: RedisEnterpriseDatabase
+metadata:
+  name: redis-db1
+spec:
+  redisEnterpriseCluster:
+    name: rec-a 
+  memorySize: 4000MB
+  replication: true
+  persistence: snapshotEvery1Hour

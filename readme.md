@@ -194,24 +194,25 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 You should see a reply from the API as in the following which indicates the payload was well formed and the request is being actioned:
 ```
 {
-  "id": "eb091f0a-839e-48a6-989f-8b5e0034f132",
+  "id": "38e6f5ad-f5e1-42f8-b588-69927d66bc05",
   "status": "queued"
 }
 ```
 *Note* Did you get something other than `queued` as a response? Then proceed to the [troubleshooting](#troubleshooting) section of the document. 
 
-You can get the status of the above task by issuing a GET on `/v1/crdbs/<id>`. Here is an example of a failed task:
+You can get the status of the above task by issuing a GET on `/v1/crdbs_tasks/<id>`. Here is an example of a failed task:
 ```
-$ curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdb_tasks/e32924c1-c8a1-4da6-a702-e1604ceab715
+$ curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdb_tasks/38e6f5ad-f5e1-42f8-b588-69927d66bc05
 {
+  "crdb_guid": "9c1b9bc7-8634-4b10-9d29-c58d6a5cc640",
   "errors": [
     {
-      "cluster_name": "",
-      "description": "Error [401]",
-      "error_code": "internal_error"
+      "cluster_name": "rec-a.raas-site-a.svc.cluster.local",
+      "description": "Cannot allocate nodes for shards",
+      "error_code": "db_create_failed"
     }
   ],
-  "id": "e32924c1-c8a1-4da6-a702-e1604ceab715",
+  "id": "38e6f5ad-f5e1-42f8-b588-69927d66bc05",
   "status": "failed"
 }
 ```
@@ -270,12 +271,13 @@ The API endpoint is not reachable from one cluster to the other.
   
 
 1. API response 400, bad request:
-```
-{
-  "detail": "None is not of type 'object'",
-  "status": 400,
-  "title": "Bad Request",
-  "type": "about:blank"
-}
-```
+    ```
+    {
+    "detail": "None is not of type 'object'",
+    "status": 400,
+    "title": "Bad Request",
+    "type": "about:blank"
+    }
+    ```
     * Your payload is not being passed to the API or the payload is not valid JSON. Please Lint your JSON or try Postman with built-in JSON validate.
+  

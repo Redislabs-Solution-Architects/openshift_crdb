@@ -15,8 +15,10 @@
 ## High Level Workflow
 The following is the high level workflow which you will follow:
 1. Document the required parameters.
-2. Formulate the CRDB creation JSON payload using the parameters *from both RECs* in a single JSON document.
-3. POST the JSON payload *to one* of the REC's API endpoints. (Yes, just one; it will coordinate with the other(s).)
+2. Apply the `activeActive` spec to both clusters.
+3. Formulate the CRDB creation JSON payload using the parameters *from both RECs* in a single JSON document.
+4. POST the JSON payload *to one* of the REC's API endpoints. (Yes, just one; it will coordinate with the other(s).)
+5. Run a workload.
 
 
 ## Required Parameters
@@ -38,6 +40,7 @@ Here is an example when creating a CRDB with database name <i>test-db</i>:
 | `credentials` | username: `b@rl.com`, password: `something` | 
 | `replication_endpoint` | <i>test-db</i><span style="color:orange">-raas-site-a.apps.bbokdoct.redisdemo.com</span>:443  |
 | `replication_tls_sni` | <i>test-db</i><span style="color:orange">-raas-site-a.apps.bbokdoct.redisdemo.com</span> |
+
 *Note:* My openshift cluster creates routes at the subdomain `*.apps.bbokdoct.redisdemo.com` by default where my openshift cluster name is `bbokdoct.redisdemo.com`.
 
 ## Let's go!
@@ -46,7 +49,9 @@ Ensure you've documented the required parameters as in the above section. You'll
 
 *Important Note:* In the samples below I am creating two Redis Enterprise Clusters (RECs) in the *same* Openshift cluster but two distinct namespaces. The same steps will apply for RECs in different Openshift clusters. 
 
-1. Apply the `activeActive` spec to both Redis Enterprise clusters appropriately. Details about the REC API are <a href="https://github.com/RedisLabs/redis-enterprise-k8s-docs/blob/master/redis_enterprise_cluster_api.md" target="_blank">here</a>.
+### 1. Apply the activeActive Spec
+
+Apply the `activeActive` spec to both Redis Enterprise clusters appropriately. Details about the REC API are <a href="https://github.com/RedisLabs/redis-enterprise-k8s-docs/blob/master/redis_enterprise_cluster_api.md" target="_blank">here</a>.
 
 REC at site A:
 ```
@@ -142,8 +147,9 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 ```
 
 
+### 2. Create the JSON Payload
 
-2. Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
+Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
 ```
 {
     "default_db_config": {
@@ -184,8 +190,11 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
     "compression": 0
   }
 ```
+### 3. Request the Active-Active DB with the JSON Payload
 
-3. Apply the following to the API endpoint at *just one* cluster:
+In this step you will make the Active-Active DB request to just one cluster member. *Why just one?* This request is coordinated among members: You request one member to initiate the coordination *by including* the list of, and credentials for, each Active-Active DB member. 
+
+Apply the following to the API endpoint at *just one* cluster API endpoint:
 
 `curl -k -u b@rl.com:<snip> https://api-raas-site-a.apps.bbokdoct.redisdemo.com/v1/crdbs -X POST -H 'Content-Type: application/json' -d @crdb.json`
 
@@ -242,8 +251,57 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 route.route.openshift.io/test-db     test-db-raas-site-b.apps.bbokdoct.redisdemo.com           test-db    17946   passthrough   None
 ```
 
-## Troubleshooting Steps
+### 4. Run a Workload
+<a href="workload"></a>
+It's time to test your deployment. You can use the redis benchmarking tool `memtier_benchmark` <a href="https://github.com/RedisLabs/memtier_benchmark" _target="blank">[link]</a>. Here are a couple of examples deployment manifests: 
 
+1. <a href="./benchmark.yaml" _target="blank">Benchmark without TLS</a>.
+2. <a href="./benchmark-tls.yaml" _target="blank">Benchmark with TLS</a>, required when working through Openshift Routes.
+
+Below is an example invocation of `memtier_benchmark` as from the commandline which is as-is reflected in the manifest file linked above: <a href="./benchmark-tls.yaml" _target="blank">Benchmark with TLS</a>. This invocation should yield somewhere between 3k and 10k requests per second. If you want to generate more workload, adjust the `Limits` and `requests` values in this manifest: `memtier_benchmark` will consume as much resources as are given to it. 
+```
+memtier_benchmark -a YkBybC5jb20= -s db-raas-site-a.apps.bbokdoct.redisdemo.com -p 443 --tls --tls-skip-verify --sni db-raas-site-a.apps.bbokdoct.redisdemo.com --ratio=1:3 --data-size-pattern=R --data-size-range=128-2800 --requests=20000000 --pipeline=1 --clients=4 --threads=5 --run-count=3
+```
+What do the arguments above mean?
+* `-a <password>`, `-s <server>`, `-p <port>`: use Redis basic [`Auth`](https://redis.io/commands/auth) (without a specified user) to connect to a Redis `server` on a specified `port`.
+* `--tls --tls-skip-verify`: Use TLS but to not verify server identity. If you've installed your own server certs or installed our CA then `--tls-skip-verify` is likely unnecessary.
+* Other options are fairly straight forward: 
+  * Use a `1:3` W:R ratio 
+  * Randomize the data size between `128` and `2800` Bytes
+  * Execute `20M` commands with only one command per requests (`--pipeline=1`)
+  * Create `4` clients with `5` working threads each
+  * Do all the above 3 times.  
+
+To apply the benchmark workload: 
+1. Edit the arguments in the file. 
+   * You can specify values directly with `env: {name, value}` pairs:
+      ```
+      env:
+        - name: REDIS_PORT
+          value: "443"
+      ```
+   * You can also get the values from K8s Secrets as in the following: 
+      ```
+      - name: REDIS_PASSWORD
+        valueFrom:
+            secretKeyRef:
+              key: password
+              name: redb-redis-db1 
+      ```
+2. Apply the manifest: `oc apply -f benchmark-tls.yaml`. If the arguments are properly specified then you will see a deployment and pod created for this workload. 
+
+```
+brad@red-mbp:~/Desktop/code/k8s_musings/oct26/redis-enterprise-k8s-docs$ oc get all
+NAME                                             READY   STATUS    RESTARTS   AGE
+pod/redis-benchmark-tls-fd5df8549-wm4xs          1/1     Running   0          8m9s
+
+NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/redis-benchmark-tls         1/1     1            1           88m
+```
+
+Alas, this is not a `memtier_benchmark` tutorial. Feel free to try out some of the other command line options. 
+
+## Troubleshooting Steps
 
 1. Symptom: API endpoint not reachable
 The API endpoint is not reachable from one cluster to the other. 
@@ -275,3 +333,8 @@ The API endpoint is not reachable from one cluster to the other.
     ```
     * Your payload is not being passed to the API or the payload is not valid JSON. Please Lint your JSON or try Postman with built-in JSON validate.
   
+## What's next?
+
+1.  Generate some workload against the Active-active DB as in <a href="benchmark.yml" target="_blank">this manifest</a> using `memtier_benchmark`. 
+
+

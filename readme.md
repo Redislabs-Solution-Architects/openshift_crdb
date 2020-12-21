@@ -49,7 +49,11 @@ Ensure you've documented the required parameters as in the above section. You'll
 
 *Important Note:* In the samples below I am creating two Redis Enterprise Clusters (RECs) in the *same* Openshift cluster but two distinct namespaces. The same steps will apply for RECs in different Openshift clusters. 
 
-### 1. Apply the activeActive Spec
+### 1. Document the Required Parameters
+
+As in the above section: Required Parameters.
+
+### 2. Apply the activeActive Spec
 
 Apply the `activeActive` spec to both Redis Enterprise clusters appropriately. Details about the REC API are <a href="https://github.com/RedisLabs/redis-enterprise-k8s-docs/blob/master/redis_enterprise_cluster_api.md" target="_blank">here</a>.
 
@@ -147,7 +151,7 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 ```
 
 
-### 2. Create the JSON Payload
+### 3. Create the JSON Payload
 
 Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
 ```
@@ -190,7 +194,7 @@ Create the JSON payload for CRDB creation request as in this <a href="./crdb.jso
     "compression": 0
   }
 ```
-### 3. Request the Active-Active DB with the JSON Payload
+### 4. Request the Active-Active DB with the JSON Payload
 
 In this step you will make the Active-Active DB request to just one cluster member. *Why just one?* This request is coordinated among members: You request one member to initiate the coordination *by including* the list of, and credentials for, each Active-Active DB member. 
 
@@ -251,7 +255,7 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 route.route.openshift.io/test-db     test-db-raas-site-b.apps.bbokdoct.redisdemo.com           test-db    17946   passthrough   None
 ```
 
-### 4. Run a Workload
+### 5. Run a Workload
 <a href="workload"></a>
 It's time to test your deployment. You can use the redis benchmarking tool `memtier_benchmark` <a href="https://github.com/RedisLabs/memtier_benchmark" _target="blank">[link]</a>. Here are a couple of examples deployment manifests: 
 
@@ -332,7 +336,9 @@ The API endpoint is not reachable from one cluster to the other.
     }
     ```
     * Your payload is not being passed to the API or the payload is not valid JSON. Please Lint your JSON or try Postman with built-in JSON validate.
-  
+
+1. The Active-Active DB request was accepted and completed, but replication is not taking place. This is likely the case if either or both DB ingress routes are not working properly. Please contact your K8s/OpenShift administrator to validate these routes.
+
 ## What's next?
 
 1.  Generate some workload against the Active-active DB as in <a href="benchmark.yml" target="_blank">this manifest</a> using `memtier_benchmark`. 

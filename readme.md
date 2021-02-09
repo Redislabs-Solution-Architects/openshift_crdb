@@ -1,4 +1,4 @@
-# How to Create an Active-active (CRDB) in Redis Enterprise for Openshift
+# How to Create an Active-active Database (CRDB) in Redis Enterprise for Openshift
 
 
 ## Pre-requisites 
@@ -7,7 +7,8 @@
   * Important Note: the two RECs should have *different* `names`/`fqdn`. If this is not met, the CRDB creation will result in bad state.
 * REC _admin role_ credentials to both RECs
 * Appropriate resources available in each REC to create DBs of the requested size.
-* Openshift Permissions: a role that allows the creation of Openshift routes.
+* Openshift Permissions: a role that allows the creation of Openshift routes
+* Command line tools `kubectl` or `oc` and `jq`
 
 ## Topology
 <img src="images/topology.png" />
@@ -23,13 +24,13 @@ The following is the high level workflow which you will follow:
 
 ## Required Parameters
 The following parameters will be required to form the JSON payload to create the CRDB. 
-| Parameter | Parameter Name in REST API | Name in `crdb-cli`| Description |
-| --------- | ---  | --- | --- |
-| <a href="name"></a>Cluster FQDN | `name` | `fqdn` | This is the name of the REC as determined from ` GET https://<rec_api>/v1/cluster | jq .name`|
-| <a href="url"></a>API URL | `url` | `url` | This is the route the API endpoint as specified in `apiIngressURL`. Should be prefixed with `https://` |
-| Cluster Admin Username/password | `credentials` | `username`,`password` | Cluster Admin role username/password |
-| Replication Endpoint | `replication_endpoint` | `replication_endpoint` | This will be <`your_db_name`><`dbIngressSuffix`>:443 where `dbIngressSuffix` is specified in your REC spec |
-| Replication TLS SNI | `replication_tls_sni` | `replication_tls_sni` | This is the same as your `replication_endpoint`, but no port number required. |
+| Parameter | Parameter Name in REST API | Description | How to get it? |
+| --------- | ---  |  --- | --- |
+| <a href="name"></a>Cluster FQDN | `name`  | This is the name of the REC from the REC perspective  | `curl -u <user>:<password> https://<rec_api>/v1/cluster \| jq .name` |
+| <a href="url"></a>API URL | `url`  | This is the route the API endpoint as specified in `apiIngressURL`. Should be prefixed with `https://` | `oc get rec -o json \| jq '.items[].spec.activeActive.apiIngressUrl'` |
+| Cluster Admin Username/password | `credentials` | Cluster Admin role username/password | `get secret <cluster_name>  --template={{.data.password}} \| base64 -D`
+| Replication Endpoint | `replication_endpoint`  | This will be <`your_db_name`><`dbIngressSuffix`>:443 where `dbIngressSuffix` is specified in your `activeActive` spec | `oc get rec -o json \| jq '.items[].spec.activeActive.dbIngressSuffix'` |
+| Replication TLS SNI | `replication_tls_sni` | This is the same as your `replication_endpoint`, but no port number required. | As above.
 
 
 Here is an example when creating a CRDB with database name <i>test-db</i>:
@@ -74,21 +75,18 @@ REC at site B:
 
 You can validate that these were applied by describing the `rec` as follows:
 ```
-$ k describe rec -n raas-site-a | grep -A 3 Active
-<snip>
---
-  Active Active:
-    API Ingress URL:       api-raas-site-a.apps.bbokdoct.redisdemo.com
-    Db Ingress Suffix:     -raas-site-a.apps.bbokdoct.redisdemo.com
-    Method:                openShiftRoute
-
-$ k describe rec -n raas-site-b | grep -A 3 Active
-<snip>
---
-  Active Active:
-    API Ingress URL:       api-raas-site-b.apps.bbokdoct.redisdemo.com
-    Db Ingress Suffix:     -raas-site-b.apps.bbokdoct.redisdemo.com
-    Method:                openShiftRoute
+$ oc get rec -n raas-site-a -o json | jq '.items[].spec.activeActive'
+{
+  "apiIngressUrl": "api-raas-site-a.apps.bbokdoct.redisdemo.com",
+  "dbIngressSuffix": "-db-raas-site-a.apps.bbokdoct.redisdemo.com",
+  "method": "openShiftRoute"
+}
+$ oc get rec -n raas-site-b -o json | jq '.items[].spec.activeActive'
+{
+  "apiIngressUrl": "api-raas-site-b.apps.bbokdoct.redisdemo.com",
+  "dbIngressSuffix": "-db-raas-site-b.apps.bbokdoct.redisdemo.com",
+  "method": "openShiftRoute"
+}
 ```
 
 This will result in the API route `api-`<`clustername`> being added in both sites as below:
@@ -156,43 +154,43 @@ route.route.openshift.io/rec-b-ui    rec-b-ui-raas-site-b.apps.bbokdoct.redisdem
 Create the JSON payload for CRDB creation request as in this <a href="./crdb.json" target="_blank">example</a> using the required parameters. Save the file as `crdb.json` in your current working directory.
 ```
 {
-    "default_db_config": {
-      "name": "<db_name>",
-      "replication": false,
-      "memory_size": 10240000,
-      "aof_policy": "appendfsync-every-sec",
-      "shards_count": 1
-    },
-    "instances": [
-      {
-        "cluster": {
-          "url": "<site_a_api_endpoint>",
-          "credentials": {
-            "username": "<site_a_username>",
-            "password": "<site_a_password>"
-          },
-          "name": "<site_a_rec_name/fqdn>",
-          "replication_endpoint": "<site_a_replication_endpoint>443",
-          "replication_tls_sni": "<site_a_replication_endpoint>"
-        }
-      },
-      {
-        "cluster": {
-          "url": "<site_b_api_endpoint>",
-          "credentials": {
-            "username": "<site_b_username>",
-            "password": "<site_b_password>"
-          },
-          "name": "<site_b_rec_name/fqdn>",
-          "replication_endpoint": "<site_b_replication_endpoint>:443",
-          "replication_tls_sni": "<site_b_replication_endpoint>"
-        }
-      }
-    ],
+  "default_db_config": {
     "name": "<db_name>",
-    "encryption": true,
-    "compression": 0
-  }
+    "replication": false,
+    "memory_size": 10240000,
+    "aof_policy": "appendfsync-every-sec",
+    "shards_count": 1
+  },
+  "instances": [
+    {
+      "cluster": {
+        "url": "<site_a_api_endpoint>",
+        "credentials": {
+          "username": "<site_a_username>",
+          "password": "<site_a_password>"
+        },
+        "name": "<site_a_rec_name/fqdn>",
+        "replication_endpoint": "<site_a_replication_endpoint>443",
+        "replication_tls_sni": "<site_a_replication_endpoint>"
+      }
+    },
+    {
+      "cluster": {
+        "url": "<site_b_api_endpoint>",
+        "credentials": {
+          "username": "<site_b_username>",
+          "password": "<site_b_password>"
+        },
+        "name": "<site_b_rec_name/fqdn>",
+        "replication_endpoint": "<site_b_replication_endpoint>:443",
+        "replication_tls_sni": "<site_b_replication_endpoint>"
+      }
+    }
+  ],
+  "name": "<db_name>",
+  "encryption": true,
+  "compression": 0
+}
 ```
 ### 4. Request the Active-Active DB with the JSON Payload
 
@@ -295,7 +293,7 @@ To apply the benchmark workload:
 2. Apply the manifest: `oc apply -f benchmark-tls.yaml`. If the arguments are properly specified then you will see a deployment and pod created for this workload. 
 
 ```
-brad@red-mbp:~/Desktop/code/k8s_musings/oct26/redis-enterprise-k8s-docs$ oc get all
+$ oc get all
 NAME                                             READY   STATUS    RESTARTS   AGE
 pod/redis-benchmark-tls-fd5df8549-wm4xs          1/1     Running   0          8m9s
 
